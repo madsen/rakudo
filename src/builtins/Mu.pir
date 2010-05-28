@@ -537,6 +537,7 @@ Gets the object's identity value
 .sub '' :method :vtable('set_pmc_keyed')
     .param string key
     .param pmc value
+
     $P1 = self[key]
     '&infix:<=>'($P1, value)
     .return (value)
@@ -557,8 +558,7 @@ Gets the object's identity value
 .sub '' :method :vtable('set_pmc_keyed_int')
     .param int key
     .param pmc value
-    $P0 = box key
-    $P1 = self[$P0]
+    $P1 = self[key]
     '&infix:<=>'($P1, value)
     .return (value)
 .end
