@@ -138,6 +138,8 @@ C<n> items.  If C<n> is omitted, then reify the entire sequence.
     # If there's no $!rest, then we can stop immediately, as
     # everything has already been reified.
     if null rest goto done
+    $I0 = rest.'defined'()
+    unless $I0 goto done
 
     .local int items_n
     items_n = elements items
