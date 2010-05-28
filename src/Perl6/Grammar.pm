@@ -1220,7 +1220,6 @@ token value:sym<quote>  { <quote> }
 token value:sym<number> { <number> }
 
 proto token number { <...> }
-token number:sym<rational> { <nu=.integer>'/'<de=.integer> }
 token number:sym<complex>  { <im=.numish>'\\'?'i' }
 token number:sym<numish>   { <numish> }
 
@@ -1450,10 +1449,13 @@ token prefixish {
 }
 
 token infixish {
+    [
+    | '[' ~ ']' <infixish> <OPER=.copyOPER('infixish')>
     | <OPER=infix_circumfix_meta_operator>
     | <OPER=infix> <![=]>
     | <OPER=infix_prefix_meta_operator>
     | <infix> <OPER=infix_postfix_meta_operator>
+    ]
 }
 
 token postfixish {
@@ -1538,6 +1540,19 @@ method copyO($from) {
     # this is the best I can come up with. :-) -- jnthn
     my $m := self.MATCH();
     my $r := $m{$from}<OPER><O>;
+    Q:PIR {
+        (%r, $I0) = self.'!cursor_start'()
+        %r.'!cursor_pass'($I0, '')
+        $P0 = find_lex '$r'
+        setattribute %r, '$!match', $P0
+    };
+}
+
+method copyOPER($from) {
+    # There must be a a better way, but until pmichaud++ shows us it,
+    # this is the best I can come up with. :-) -- jnthn
+    my $m := self.MATCH();
+    my $r := $m{$from}<OPER>;
     Q:PIR {
         (%r, $I0) = self.'!cursor_start'()
         %r.'!cursor_pass'($I0, '')
@@ -1810,8 +1825,20 @@ grammar Perl6::Regex is Regex::P6Regex::Grammar {
         <?[{]> <codeblock>
     }
 
+    token metachar:sym<rakvar> {
+        <?[$@&]> <?before .<?alpha>> <var=.LANG('MAIN', 'variable')>
+    }
+
     token assertion:sym<{ }> {
         <?[{]> <codeblock>
+    }
+
+    token assertion:sym<?{ }> {
+        $<zw>=[ <[?!]> <?before '{'> ] <codeblock>
+    }
+
+    token assertion:sym<var> {
+        <?[$@&]> <var=.LANG('MAIN', 'variable')>
     }
 
     token codeblock {

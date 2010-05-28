@@ -22,20 +22,24 @@ augment class Cool {
         }
     }
 
-    multi method subst($matcher, $replacement, :g(:$global), :$x) {
-        die "Can't combine :g/:global and :x in subst"
-            if defined($global) && defined($x);
-        my $limit = defined($x) ?? $x +1 !! 2;
-        my @chunks = self.split($matcher, :limit($global ?? * !! $limit), :all);
-        if defined($x) && (@chunks < 2 * $x) {
-            return self;
-        }
-        loop (my $i = 1; $i < @chunks; $i += 2) {
-            @chunks[$i] = $replacement ~~ Callable ?? $replacement(@chunks[$i]) !! $replacement;
-        }
-        @chunks.join('');
-    }
+    multi method subst($matcher, $replacement, :$samecase, *%options) {
+        my @matches = self.match($matcher, |%options);
+        return self unless @matches;
+        return self if @matches == 1 && !@matches[0];
+        my $prev = 0;
+        my $result = '';
+        for @matches -> $m {
+            $result ~= self.substr($prev, $m.from - $prev);
 
+	    my $real_replacement = ~($replacement ~~ Callable ?? $replacement($m) !! $replacement);
+	    $real_replacement    = $real_replacement.samecase(~$m) if $samecase;
+            $result ~= $real_replacement;
+            $prev = $m.to;
+        }
+        my $last = @matches.pop;
+        $result ~= self.substr($last.to);
+        $result;
+    }
 
     multi method comb(Regex $matcher = /./, $limit = *, :$match) {
         my $c = 0;
@@ -182,7 +186,7 @@ augment class Cool {
                            :g(:$global),
                            :pos(:$p),
                            :$x,
-                           Mu :$nth,
+                           :$nth,
                            :ov(:$overlap)) {
         if $continue ~~ Bool {
             note ":c / :continue requires a position in the string";
@@ -193,6 +197,7 @@ augment class Cool {
         %opts<c> = $continue // 0 unless defined $p;
         my $x_upper = -1;
         if defined($x) {
+            return if $x == 0;
             if $x ~~ Range {
                 $x_upper = $x.excludes_max ?? $x.max - 1 !! $x.max;
             } else {
@@ -201,13 +206,29 @@ augment class Cool {
         }
 
         if $global || $nth.defined || $overlap || ($x.defined && $x_upper > 1) {
+            my $next-index;
+            my $next-iterator;
+            if $nth.defined {
+                $next-iterator = $nth.list.iterator;
+                $next-index = $next-iterator.get;
+                return if $next-index ~~ EMPTY || +$next-index < 1;
+            }
+
             my $taken = 0;
             my $i = 1;
             my @r = gather while my $m = ::Grammar.parse(self, :rule($pat), |%opts) {
                 my $m-copy = $m;
-                unless $nth.defined && ($i !~~ any |$nth) {
+                if !$nth.defined || $i == $next-index {
                     take $m-copy;
                     $taken++;
+
+                    if ($nth.defined) {
+                        $next-index = $next-iterator.get;
+                        while $next-index !~~ EMPTY && $next-index <= $i  {
+                            $next-index = $next-iterator.get;
+                        }
+                        last if $next-index ~~ EMPTY;
+                    }
                 }
                 last if $taken == $x_upper;
 
@@ -230,6 +251,9 @@ augment class Cool {
         } else {
             ::Grammar.parse(self, :rule($pat), |%opts);
         }
+    }
+    multi method match($pat, *%options) {
+        self.match(rx{ $pat }, |%options);
     }
 
     our multi method ord() {
