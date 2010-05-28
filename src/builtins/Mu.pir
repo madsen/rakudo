@@ -548,6 +548,21 @@ Gets the object's identity value
     .tailcall self.'postcircumfix:<{ }>'($P0)
 .end
 
+.sub '' :method :vtable('get_pmc_keyed_int')
+    .param int key
+    $P0 = box key
+    .tailcall self.'postcircumfix:<[ ]>'($P0)
+.end
+
+.sub '' :method :vtable('set_pmc_keyed_int')
+    .param int key
+    .param pmc value
+    $P0 = box key
+    $P1 = self[$P0]
+    '&infix:<=>'($P1, value)
+    .return (value)
+.end
+
 
 # Local Variables:
 #   mode: pir
